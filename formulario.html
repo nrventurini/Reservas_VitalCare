@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>VitalCare – Confirmar Reserva</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      padding: 2rem;
+    }
+    .card {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 10px;
+      max-width: 600px;
+      margin: 0 auto;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+    label {
+      display: block;
+      margin-top: 1rem;
+      font-weight: bold;
+    }
+    input[type="text"], input[type="tel"], input[type="email"], input[type="number"] {
+      width: 100%;
+      padding: 0.6rem;
+      margin-top: 0.4rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+    input[type="checkbox"] {
+      margin-right: 0.5rem;
+    }
+    .rgpd {
+      margin-top: 1rem;
+    }
+    .hidden {
+      display: none;
+    }
+    .captcha {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #555;
+    }
+    .captcha input {
+      width: 100px;
+      padding: 0.4rem;
+      margin-top: 0.2rem;
+    }
+    .confirmacion {
+      background: #e6ffed;
+      border: 1px solid #b2f5cb;
+      color: #276749;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1.5rem;
+      text-align: center;
+    }
+    button {
+      margin-top: 1.5rem;
+      padding: 0.8rem 1.5rem;
+      background: #007BFF;
+      color: white;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      position: relative;
+    }
+    button.loading::after {
+      content: "";
+      position: absolute;
+      right: -30px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      border: 2px solid white;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: translateY(-50%) rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>Confirma tu reserva</h1>
+    <p id="resumenReserva"></p>
+
+    
+    <div id="bloqueServicio" class="campo">
+    <label for="servicio">Selecciona el tipo de servicio:</label>
+    <select id="servicio" name="servicio" required>
+        <option value="">-- Selecciona un servicio --</option>
+        <option value="VitalCare Start">🩺 VitalCare Start (Primera visita con tu especialista), 149€</option>
+        <option value="VitalCare Follow">🔁 VitalCare Follow (Sesión seguimiento), 99€</option>
+    </select>
+    </div>
+
+
+    <form id="formReserva">
+      <label for="nombre">Nombre completo:</label>
+      <input type="text" id="nombre" name="nombre" required>
+
+      <label for="telefono">Teléfono:</label>
+      <input type="tel" id="telefono" name="telefono" required>
+
+      <label for="email">Correo electrónico:</label>
+      <input type="email" id="email" name="email" required>
+
+      <!-- Honeypot -->
+      <input type="text" name="website" class="hidden" autocomplete="off">
+
+      <div class="rgpd">
+        <label>
+          <input type="checkbox" id="rgpd" required>
+          Acepto la <a href="https://nrventurini.github.io/Pol-tica_privacidad/" target="_blank">política de privacidad</a>.
+        </label>
+      </div>
+
+      <div class="captcha">
+        <label id="captchaLabel" for="captchaRespuesta"></label>
+        <input type="number" id="captchaRespuesta" required>
+      </div>
+
+      <button type="submit" id="submitBtn">Confirmar Reserva</button>
+    </form>
+
+    <div id="confirmacion" class="confirmacion hidden">
+      ¡Gracias! Tu reserva ha sido enviada con éxito. Pronto nos pondremos en contacto contigo para realizar el pago.
+    </div>
+  </div>
+
+
+<script src="especialistas.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const especialista = params.get('especialista') || '';
+  const fecha = params.get('fecha') || '';
+  const hora = params.get('hora') || '';
+
+    //Evita reservas fuera de los días permitidos (viernes o sábado), incluso si se manipuló maliciosamente la URL.
+  const dia = new Date(fecha).getDay();
+    if (dia !== 5 && dia !== 6) {
+    alert("Solo puedes reservar en viernes o sábado. Fecha inválida.");
+    window.location.href = "index.html";
+    }
+
+
+  const form = document.getElementById('formReserva');
+  const confirmacion = document.getElementById('confirmacion');
+  const resumenEl = document.getElementById('resumenReserva');
+  const captchaLabel = document.getElementById('captchaLabel');
+  const captchaRespuesta = document.getElementById('captchaRespuesta');
+  const submitBtn = document.getElementById('submitBtn');
+  
+    // Esto hará que el nombre se tome automáticamente del archivo especialistas.js
+  const especialistaNombre = obtenerNombreEspecialistaDesdeURL();
+
+
+  resumenEl.innerText = `Estas reservando con ${especialistaNombre} el día ${fecha} a las ${hora}.`;
+
+
+  // CAPTCHA aleatorio
+  const operaciones = [
+    { pregunta: '5 + 3 = ?', respuesta: 8 },
+    { pregunta: '9 - 4 = ?', respuesta: 5 },
+    { pregunta: '2 + 5 = ?', respuesta: 7 },
+    { pregunta: '3 × 3 = ?', respuesta: 9 },
+    { pregunta: '10 - 7 = ?', respuesta: 3 },
+    { pregunta: '1 + 5 = ?', respuesta: 6 }
+  ];
+  const operacion = operaciones[Math.floor(Math.random() * operaciones.length)];
+  captchaLabel.textContent = `Verificación anti-spam: ${operacion.pregunta}`;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Honeypot check
+    if (form.website.value !== '') return;
+
+    // CAPTCHA check
+    if (parseInt(captchaRespuesta.value) !== operacion.respuesta) {
+      alert('Respuesta incorrecta en la verificación de seguridad.');
+      return;
+    }
+
+    // Definimos aquí el valor del campo "servicio",
+    const servicio = document.getElementById('servicio').value.trim();
+
+    // Mapeamos los datos exactamente como en Google Sheet
+     const data = {
+    "Nombre": form.nombre.value.trim(),
+    "Teléfono": form.telefono.value.trim(),
+    "Email": form.email.value.trim(),
+    "Día de Reserva": fecha,
+    "Hora de reserva": hora,
+    "Especialista": especialistaNombre,
+    "Servicio": servicio
+    };
+
+
+    //Servicio seleccionado check
+    if (!servicio) {
+    alert("Por favor, selecciona un tipo de servicio.");
+    return;
+        }
+
+    // Animación del botón
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Reservando...";
+    submitBtn.classList.add("loading");
+
+    try {
+      console.log("Datos que se enviarán:", data);
+      await fetch("https://script.google.com/macros/s/AKfycbxfbKPmhiVn-_5KCfLanw9lXcJ_GWvx56fLmdvAuWfSyfLW54og6c4Q1xq1WdqsJJEy/exec", {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      form.classList.add('hidden');
+      document.getElementById('bloqueServicio').classList.add('hidden');
+      confirmacion.classList.remove('hidden');
+      confirmacion.scrollIntoView({ behavior: 'smooth' });  //Asegura que el usuario vea el mensaje de confirmación, aunque esté arriba en el formulario.
+
+    } catch (error) {
+      alert("Hubo un error al enviar la reserva. Intenta nuevamente.");
+      console.error(error);
+    }
+  });
+
+</script>
+
+
+</body>
+</html>
+

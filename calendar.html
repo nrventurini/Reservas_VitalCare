@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>VitalCare – Elige tu horario</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- Estilos Flatpickr -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  
+  <style>
+
+
+    @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f4f6f9;
+    }
+    .hidden {
+      display: none;
+    }
+    .card {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 10px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+    button {
+      display: block;
+      margin: 1.5rem auto 0;
+      padding: 0.8rem 1.5rem;
+      font-size: 16px;
+      background: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .option-btn {
+    display: inline-block;
+    margin: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    background: #d4edda; /* Verde suave (disponible) */
+    border: 1px solid #28a745;
+    border-radius: 5px;
+    cursor: pointer;
+    color: #155724;
+    font-weight: bold;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .option-btn:not(:disabled):hover {
+    background: #c3e6cb; /* Verde más vivo al pasar el mouse */
+    }
+
+    .option-btn.selected {
+    background: #007BFF !important; /* Azul VitalExtension (seleccionado) */
+    color: white !important;
+    border-color: #007BFF !important;
+    }
+
+    .option-btn:disabled {
+    background: #ccc !important; /* Gris claro (no disponible) */
+    color: #666 !important;
+    border: 1px solid #aaa !important;
+    cursor: not-allowed !important;
+    }
+    
+    #calendario {
+      max-width: 300px;
+      margin: 1rem auto;
+    }
+
+    #btnReservar {
+  opacity: 0.6;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+    #btnReservar.activo {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.alert-warning {
+  background-color: #e6f0ff; /* Azul muy suave */
+  border: 1px solid #b3d7ff;
+  color: #0056b3; /* Azul VitalExtension */
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.95rem;
+  animation: fadeInUp 0.6s ease-out;
+  margin-top: 1rem;
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>Reserva con <span id="especialistaNombre"></span></h1>
+    <p>Selecciona una fecha disponible:</p>
+    <input type="text" id="calendario" placeholder="Selecciona una fecha" readonly>
+  </div>
+
+  <!-- CARGANDO CALENDARIO -->
+    <div id="loading" style="text-align: center; padding: 2rem; font-size: 1.2rem; color: #2c3e50;">
+    <div id="spinner" style="
+        border: 6px solid #f3f3f3;
+        border-top: 6px solid #2c3e50;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 1rem auto;">
+    </div>
+    <p><strong>Cargando calendario</strong>, por favor espera...</p>
+    </div>
+
+  <div class="card hidden" id="horariosCard">
+    <h2>Selecciona un horario</h2>
+    <p style="text-align:center; margin-top: 12px; font-size: 0.9rem; color: #555;">
+  <strong>Nota:</strong> Todos los horarios mostrados corresponden a la hora de España peninsular (UTC+2), incluyendo ciudades como Madrid, Sevilla o Barcelona. 
+  Si reservas desde otro país, ten en cuenta la diferencia horaria.
+</p>
+    <div id="horasDisponibles"></div>
+  </div>
+
+  <button id="btnReservar" class="btn btn-primary" onclick="mostrarSpinnerYRedirigir()"disabled>Reservar</button>
+
+  <button onclick="window.history.back()">← Retroceder</button>
+
+  <!-- Flatpickr JS -->
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="especialistas.js"></script>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const especialista = urlParams.get('especialista');
+
+
+    const especialistaKey = new URLSearchParams(window.location.search).get("especialista");
+    const especialistaNombre = obtenerNombreEspecialistaDesdeURL();  // ← usa especialistas.js
+
+
+    const horariosPorDia = {
+      5: ['18:00 - 19:00'],   // Viernes
+      6: ['11:00 - 12:00']    // Sábado
+    };
+
+    const especialistaNombreEl = document.getElementById("especialistaNombre");
+    const horariosCard = document.getElementById("horariosCard");
+    const horasDiv = document.getElementById("horasDisponibles");
+    const btnReservar = document.getElementById("btnReservar");
+
+    let fechaSeleccionada = "";
+    let horaSeleccionada = "";
+
+    especialistaNombreEl.textContent = especialistaNombre || 'el especialista';
+
+    //Previene errores si el ID de especialista es incorrecto o por manipulación maliciosa desde la URL.
+    if (!especialistaNombre || especialistaNombre === "Especialista desconocido") {
+    alert("Error: el especialista no se ha cargado correctamente. Por favor, vuelve atrás y selecciona uno.");
+    window.location.href = "index.html";
+}
+
+async function init() {
+  await obtenerReservas(); // Esperar a que termine
+
+  console.log("Reservas preparadas para validación en calendario:", reservasOcupadas);
+
+  flatpickr("#calendario", {
+    dateFormat: "Y-m-d",
+    minDate: "today",
+    inline: true,
+        disable: [
+        function(date) {
+            return (date.getDay() !== 5 && date.getDay() !== 6); // Solo viernes y sábado
+            }
+        ],
+
+            onChange: function(selectedDates, dateStr, instance) {
+            const fecha = dateStr;
+            const diaSemana = selectedDates[0].getDay();
+            const horarios = horariosPorDia[diaSemana] || [];
+
+            fechaSeleccionada = fecha;
+            horaSeleccionada = "";
+            btnReservar.disabled = true;
+            horariosCard.classList.remove('hidden');
+            horasDiv.innerHTML = '';
+
+                // Verifica si todas las horas están ocupadas antes de renderizar botones
+                let hayDisponibles = false;
+
+                horarios.forEach(hora => {
+                const hBtn = document.createElement('button');
+                hBtn.classList.add('option-btn');
+
+                const ocupado = reservasOcupadas.find(r =>
+                    r.fecha?.trim() === fechaSeleccionada.trim() &&
+                    r.hora?.trim() === hora.trim() &&
+                    r.especialista === especialistaNombre
+                );
+
+                if (ocupado) {
+                    hBtn.textContent = `${hora} (NO DISPONIBLE)`;
+                    hBtn.disabled = true;
+                    hBtn.style.backgroundColor = "#eee";
+                    hBtn.style.color = "#888";
+                    hBtn.style.border = "1px solid #ccc";
+                } else {
+                    hBtn.textContent = hora;
+                    hayDisponibles = true; // ✅ Al menos una hora disponible
+
+                    hBtn.addEventListener('click', () => {
+                    document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+                    hBtn.classList.add('selected');
+                    horaSeleccionada = hora;
+                    btnReservar.disabled = false;
+                    btnReservar.classList.add('activo');
+                    });
+                }
+
+                horasDiv.appendChild(hBtn);
+                });
+
+                // ✅ Solo mostramos el mensaje si todas las horas están ocupadas
+                if (!hayDisponibles) {
+                  horasDiv.innerHTML = `
+                    <div class="alert-warning">
+                    No hay horarios disponibles para esta fecha.<br>Por favor, selecciona otra fecha.
+                    </div>
+                    `;
+                }
+            },
+              
+            // ✅ Aquí se oculta el spinner solo cuando el calendario esté listo
+            onReady: function() {
+            document.getElementById('loading').style.display = 'none';
+            }
+
+  });
+}
+
+
+        function mostrarSpinnerYRedirigir() {
+        const btn = document.getElementById('btnReservar');
+        btn.textContent = "Procesando...";
+        btn.disabled = true;
+
+        document.getElementById('loading').style.display = 'block';
+        setTimeout(() => {
+            const params = new URLSearchParams({
+            especialista,
+            fecha: fechaSeleccionada,
+            hora: horaSeleccionada
+            });
+            window.location.href = `formulario.html?${params.toString()}`;
+        }, 800);
+        }
+
+
+
+    const reservasOcupadas = [];
+
+async function obtenerReservas() {
+  try {
+    const res = await fetch("https://script.google.com/macros/s/AKfycbxfbKPmhiVn-_5KCfLanw9lXcJ_GWvx56fLmdvAuWfSyfLW54og6c4Q1xq1WdqsJJEy/exec");
+    const data = await res.json();
+
+    // Obtener el ID lógico de la URL (ej. especialista1)
+    const especialistaKey = new URLSearchParams(window.location.search).get("especialista");
+
+    // Convertir ese ID en el nombre real (ej. Dra. Jessica)
+    const especialistaNombre = mapaEspecialistas[especialistaKey]?.nombre;
+
+    //Evita que el sistema intente cargar un especialista que no existe (por error en la URL o manipulación maliciosa).
+    if (!mapaEspecialistas[especialistaKey]) {
+    alert("Especialista inválido. Por favor, selecciona uno desde el inicio.");
+    window.location.href = "index.html";
+    return;
+}
+
+
+    // Validación por consola
+    console.log("El Especialista actual es:", especialistaNombre);
+
+    // Filtrar reservas que coincidan con el nombre real del especialista
+    data.forEach(r => {
+    if (
+        r["Día de Reserva"] &&
+        r["Hora de reserva"] &&
+        r["Especialista"] &&
+        r["Especialista"].trim() === especialistaNombre
+    ) {
+        reservasOcupadas.push({
+            fecha: new Date(r["Día de Reserva"]).toLocaleDateString('sv-SE'), // asegura formato 'YYYY-MM-DD'
+            hora: r["Hora de reserva"].trim(),
+            especialista: especialistaNombre
+        });
+    }
+    });
+    ;
+
+
+    console.log("Reservas ocupadas de Especialista Actual leídas en Google Sheet:", reservasOcupadas);
+
+  } catch (error) {
+    console.error("Error al obtener reservas:", error);
+  }
+}
+
+init();
+
+  </script>
+
+</body>
+</html>

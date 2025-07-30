@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>VitalCare – Reserva tu cita</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 2rem; background: #f7f9fc; }
+    .hidden { display: none; }
+    .card { border: 1px solid #ccc; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; background: #fff; }
+    .button { background: #007BFF; color: white; padding: 0.8rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; }
+    .button:disabled { background: #ccc; cursor: not-allowed; }
+    select { width: 100%; padding: 0.5rem; margin-top: 0.5rem; margin-bottom: 1rem; }
+    label { font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <h1>Bienvenido a VITALCARE</h1>
+  <p>Selecciona el especialista que más se ajuste a tus necesidades:</p>
+
+    <div id="descripcionEspecialista" class="descripcion" style="margin-top: 1em; font-style: italic; color: #555;"></div>
+
+
+  <div class="card">
+  <label for="especialistaSelect">Elige tu especialista:</label>
+  <select id="especialistaSelect">
+    <option value="">-- Selecciona un especialista --</option>
+  </select>
+</div>
+
+  <div id="infoEspecialista" class="card hidden"></div>
+
+  <button id="siguienteBtn" class="button" disabled>Siguiente</button>
+
+
+  <script src="especialistas.js"></script>
+<script>
+  const selectEspecialista = document.getElementById("especialistaSelect");
+  const btnSiguiente = document.getElementById("siguienteBtn");
+  const descripcionDiv = document.getElementById("descripcionEspecialista");
+
+
+    Object.keys(mapaEspecialistas).forEach(id => {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = mapaEspecialistas[id].nombre;
+    selectEspecialista.appendChild(opt);
+
+  });
+
+  selectEspecialista.addEventListener("change", () => {
+    const id = selectEspecialista.value;
+
+    if (mapaEspecialistas[id]) {
+      const info = mapaEspecialistas[id];
+      descripcionDiv.innerHTML = `
+        <strong>${info.nombre}</strong><br>
+        <em>${info.especialidad}</em><br>
+        ${info.descripcion}
+      `;
+      btnSiguiente.disabled = false;
+    } else {
+      descripcionDiv.textContent = "";
+      btnSiguiente.disabled = true;
+    }
+  });
+
+  btnSiguiente.addEventListener("click", () => {
+    const id = selectEspecialista.value;
+    if (id) {
+      window.location.href = `calendar.html?especialista=${id}`;
+    }
+  });
+</script>
+
+
+</body>
+</html>
